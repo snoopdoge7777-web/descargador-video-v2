@@ -17,7 +17,9 @@ def process_and_send(url, webhook_url):
         os.makedirs(work_dir, exist_ok=True)
 
         raw_path = os.path.join(work_dir, 'input.mp4')
-        cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
+        
+        # Ruta robusta para encontrar el archivo de cookies en el directorio del script
+        cookie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www.youtube.com_cookies.txt')
 
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
@@ -33,7 +35,7 @@ def process_and_send(url, webhook_url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        # 2. Análisis de silencios
+        # 2. Análisis de silencios con FFmpeg
         silence_cmd = [
             'ffmpeg', '-i', raw_path,
             '-af', 'silencedetect=noise=-30dB:d=0.8',
