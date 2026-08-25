@@ -25,12 +25,8 @@ def process_and_send(url, webhook_url):
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': raw_path,
             'quiet': True,
-            'extractor_args': {
-                'youtube': [
-                    'player_client=ios,android,web',
-                    'remote_components=ejs:github'  # Habilita el uso de Deno para resolver los retos de JavaScript
-                ]
-            }
+            'extractor_args': {'youtube': ['player_client=ios,android,web']},
+            'remote_components': {'ejs': 'github'}  # <-- La forma correcta en el diccionario para habilitar Deno
         }
 
         if os.path.exists(cookie_path):
