@@ -23,26 +23,22 @@ def download_video():
     raw_path = os.path.join(work_dir, 'input.mp4')
     cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
-    # FUERZA 1080p o la máxima resolución disponible + audio de mejor calidad
     ydl_opts = {
-        'format': 'bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best',
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': raw_path,
         'quiet': True,
-        'merge_output_format': 'mp4',
-        'extractor_args': {
-            'youtube': ['player_client=ios,android,web']
-        }
+        'extractor_args': {'youtube': ['player_client=ios,android,web']}
     }
 
     if os.path.exists(cookie_path):
         ydl_opts['cookiefile'] = cookie_path
 
     try:
-        # 1. Descarga el stream de video HD y audio por separado y los une directamente al archivo
+        # 1. Descarga completa del video en alta calidad
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        # 2. Detección de silencios rápida
+        # 2. Análisis de silencios
         silence_cmd = [
             'ffmpeg', '-i', raw_path,
             '-af', 'silencedetect=noise=-30dB:d=0.8',
@@ -59,7 +55,7 @@ def download_video():
         current_start = 0.0
         clip_index = 1
 
-        # 3. Recorte relámpago con "-c copy" (mantiene los 1080p intactos sin usar RAM/CPU)
+        # 3. Recorte de TODOS los clips
         for s_start, s_end in zip(starts, ends):
             duration = s_start - current_start
             if duration > 1.5:
@@ -74,7 +70,7 @@ def download_video():
                 clip_index += 1
             current_start = s_end
 
-        # Último segmento
+        # Último fragmento hasta el final del video
         subprocess.run([
             'ffmpeg', '-y',
             '-ss', str(current_start),
@@ -83,7 +79,7 @@ def download_video():
             os.path.join(clips_dir, f'clip_{clip_index:03d}.mp4')
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 4. Crear el paquete ZIP final
+        # 4. Compresión a ZIP
         zip_path = '/tmp/clips_recortados'
         archive_path = shutil.make_archive(zip_path, 'zip', clips_dir)
 
@@ -96,4 +92,5 @@ def download_video():
         return {"status": "error", "message": f"Error de proceso: {str(e)}"}, 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
