@@ -8,30 +8,49 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-def descargar_con_cobalt(youtube_url, output_path):
-    print(f"--> Iniciando descarga desde Cobalt para: {youtube_url}")
-    url_api = "https://api.cobalt.tools/api/json"
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "url": youtube_url,
-        "vQuality": "1080"
-    }
-    res = requests.post(url_api, json=payload, headers=headers, timeout=30)
-    data = res.json()
-    
-    stream_url = data.get("url")
-    if not stream_url:
-        raise Exception(f"Error con Cobalt: {data}")
+def descargar_video(youtube_url, output_path):
+    # Limpiar URL si viene con signo '=' al principio desde n8n
+    youtube_url = youtube_url.lstrip("=")
+    print(f"--> Descargando video con yt-dlp: {youtube_url}")
 
-    print("--> Cobalt generó el enlace. Descargando archivo MP4...")
-    with requests.get(stream_url, stream=True) as r:
-        r.raise_for_status()
-        with open(output_path, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
+    # Intentar descarga primaria con yt-dlp (máxima compatibilidad y calidad hasta 1080p)
+    cmd = [
+        'yt-dlp',
+        '-f', 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        '--no-playlist',
+        '--merge-output-format', 'mp4',
+        '-o', output_path,
+        youtube_url
+    ]
+
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    
+    if result.returncode != 0:
+        print(f"--> Error con yt-dlp: {result.stderr}")
+        # Intento de respaldo con la nueva API v10 de Cobalt
+        print("--> Intentando respaldo con la nueva API de Cobalt v10...")
+        url_api = "https://api.cobalt.tools/"
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "url": youtube_url,
+            "videoQuality": "1080"
+        }
+        res = requests.post(url_api, json=payload, headers=headers, timeout=30)
+        data = res.json()
+        stream_url = data.get("url")
+        
+        if not stream_url:
+            raise Exception(f"No se pudo descargar el video. Fallaron yt-dlp y Cobalt: {data}")
+
+        with requests.get(stream_url, stream=True) as r:
+            r.raise_for_status()
+            with open(output_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
     print("--> Descarga completada con éxito.")
 
 def process_and_send(url, webhook_url):
@@ -43,8 +62,8 @@ def process_and_send(url, webhook_url):
 
         raw_path = os.path.join(work_dir, 'input.mp4')
 
-        # 1. Descarga directa con Cobalt
-        descargar_con_cobalt(url, raw_path)
+        # 1. Descarga del video
+        descargar_video(url, raw_path)
 
         # 2. Análisis de silencios con FFmpeg
         print("--> Analizando silencios en el video con FFmpeg...")
@@ -78,11 +97,12 @@ def process_and_send(url, webhook_url):
 
             # Enviar archivo individual a n8n
             if webhook_url and os.path.exists(out_clip):
-                print(f"--> Enviando {clip_name} al Webhook de n8n ({webhook_url})...")
+                webhook_clean = webhook_url.lstrip("=")
+                print(f"--> Enviando {clip_name} a n8n ({webhook_clean})...")
                 with open(out_clip, 'rb') as f:
                     files = {'data': (clip_name, f, 'video/mp4')}
-                    response = requests.post(webhook_url, files=files)
-                    print(f"--> Estado de envío para {clip_name}: {response.status_code}")
+                    response = requests.post(webhook_clean, files=files)
+                    print(f"--> Respuesta de n8n para {clip_name}: Código {response.status_code}")
                 os.remove(out_clip)
             elif not webhook_url:
                 print(f"--> ADVERTENCIA: No se recibió webhook_url. {clip_name} no fue enviado.")
@@ -112,11 +132,11 @@ def process_and_send(url, webhook_url):
 def download_video():
     data = request.get_json() or {}
     
-    # Busca 'url' o 'targetUrl' (según cómo lo mande n8n)
-    url = data.get('url') or data.get('targetUrl')
+    url = data.get('url') or data.get('targetUrl') or ""
+    webhook_url = data.get('webhook_url') or data.get('webhookUrl') or ""
     
-    # Busca 'webhook_url' o 'webhookUrl'
-    webhook_url = data.get('webhook_url') or data.get('webhookUrl')
+    url = url.lstrip("=")
+    webhook_url = webhook_url.lstrip("=")
     
     print(f"--> Petición recibida en /download. URL: {url} | Webhook: {webhook_url}")
 
