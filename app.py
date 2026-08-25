@@ -10,11 +10,11 @@ def descargar_video(youtube_url, output_path):
     youtube_url = youtube_url.lstrip("=")
     print(f"--> Descargando video en máxima calidad: {youtube_url}")
 
-    # Descarga la máxima calidad disponible (video + audio) sin restringir contenedor a mp4 inicial
+    # Configuración de clientes para evadir el JS challenge de YouTube
     cmd = [
         'yt-dlp',
         '--cookies', 'cookies.txt',
-        '--extractor-args', 'youtube:player_client=web,mweb',
+        '--extractor-args', 'youtube:player_client=tv,web_creator,mweb',
         '-f', 'bv*+ba/b',
         '--no-playlist',
         '--merge-output-format', 'mp4',
@@ -25,10 +25,11 @@ def descargar_video(youtube_url, output_path):
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     
     if result.returncode != 0:
-        print(f"--> Falló intento 1. Reintentando sin extractor-args...")
+        print(f"--> Falló intento 1. Reintentando con cliente ios...")
         cmd_alt = [
             'yt-dlp',
             '--cookies', 'cookies.txt',
+            '--extractor-args', 'youtube:player_client=ios',
             '-f', 'bv*+ba/b',
             '--no-playlist',
             '--merge-output-format', 'mp4',
