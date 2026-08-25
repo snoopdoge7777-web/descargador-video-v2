@@ -18,14 +18,15 @@ def process_and_send(url, webhook_url):
 
         raw_path = os.path.join(work_dir, 'input.mp4')
         
-        # Ruta robusta para encontrar el archivo de cookies en el directorio del script
+        # Ruta robusta apuntando exactamente al archivo de cookies del repositorio
         cookie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www.youtube.com_cookies.txt')
 
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': raw_path,
             'quiet': True,
-            'extractor_args': {'youtube': ['player_client=ios,android,web']}
+            'extractor_args': {'youtube': ['player_client=ios,android,web']},
+            'remote_components': {'ejs': 'github'}  # Permite usar Deno para resolver los retos de YouTube
         }
 
         if os.path.exists(cookie_path):
