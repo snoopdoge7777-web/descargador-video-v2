@@ -5,9 +5,31 @@ import subprocess
 import threading
 import requests
 from flask import Flask, request, jsonify
-import yt_dlp
 
 app = Flask(__name__)
+
+def descargar_con_cobalt(youtube_url, output_path):
+    url_api = "https://api.cobalt.tools/api/json"
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "url": youtube_url,
+        "vQuality": "1080"
+    }
+    res = requests.post(url_api, json=payload, headers=headers, timeout=30)
+    data = res.json()
+    
+    stream_url = data.get("url")
+    if not stream_url:
+        raise Exception(f"Error con Cobalt: {data}")
+
+    with requests.get(stream_url, stream=True) as r:
+        r.raise_for_status()
+        with open(output_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
 
 def process_and_send(url, webhook_url):
     work_dir = '/tmp/clips'
@@ -17,30 +39,9 @@ def process_and_send(url, webhook_url):
         os.makedirs(work_dir, exist_ok=True)
 
         raw_path = os.path.join(work_dir, 'input.mp4')
-        
-        # Ruta al archivo de cookies en la raíz del proyecto
-        cookie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www.youtube.com_cookies.txt')
 
-        # Habilitación de componentes remotos nativa para la API de Python
-        ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
-            'outtmpl': raw_path,
-            'quiet': True,
-            'no_check_certificate': True,
-            'remote_components': ['ejs:github'],
-            'extractor_args': {
-                'youtube': [
-                    'player_client=ios,android,web'
-                ]
-            }
-        }
-
-        if os.path.exists(cookie_path):
-            ydl_opts['cookiefile'] = cookie_path
-
-        # 1. Descarga del video en alta resolución
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        # 1. Descarga directa con Cobalt
+        descargar_con_cobalt(url, raw_path)
 
         # 2. Análisis de silencios con FFmpeg
         silence_cmd = [
@@ -59,45 +60,43 @@ def process_and_send(url, webhook_url):
         current_start = 0.0
         clip_index = 1
 
-        # 3. Recorte ultra rápido sin pérdida de calidad (-c copy)
+        # Helper para recortar y enviar individualmente
+        def recortar_y_enviar(inicio, fin):
+            nonlocal clip_index
+            clip_name = f'clip_{clip_index:03d}.mp4'
+            out_clip = os.path.join(clips_dir, clip_name)
+            
+            cmd = ['ffmpeg', '-y', '-ss', str(inicio)]
+            if fin is not None:
+                cmd.extend(['-to', str(fin)])
+            cmd.extend(['-i', raw_path, '-c', 'copy', out_clip])
+
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            # Enviar el archivo individual al Webhook de n8n
+            if webhook_url and os.path.exists(out_clip):
+                with open(out_clip, 'rb') as f:
+                    files = {'file': (clip_name, f, 'video/mp4')}
+                    requests.post(webhook_url, files=files)
+                os.remove(out_clip) # Liberar memoria inmediatamente
+
+            clip_index += 1
+
+        # 3. Procesar y transmitir clip por clip
         for s_start, s_end in zip(starts, ends):
             duration = s_start - current_start
             if duration > 1.5:
-                out_clip = os.path.join(clips_dir, f'clip_{clip_index:03d}.mp4')
-                subprocess.run([
-                    'ffmpeg', '-y',
-                    '-ss', str(current_start), '-to', str(s_start),
-                    '-i', raw_path,
-                    '-c', 'copy',
-                    out_clip
-                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                clip_index += 1
+                recortar_y_enviar(current_start, s_start)
             current_start = s_end
 
         # Último fragmento
-        subprocess.run([
-            'ffmpeg', '-y',
-            '-ss', str(current_start),
-            '-i', raw_path,
-            '-c', 'copy',
-            os.path.join(clips_dir, f'clip_{clip_index:03d}.mp4')
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        # 4. Compresión a ZIP
-        zip_path = '/tmp/clips_recortados'
-        archive_path = shutil.make_archive(zip_path, 'zip', clips_dir)
+        recortar_y_enviar(current_start, None)
 
         if os.path.exists(raw_path):
             os.remove(raw_path)
 
-        # 5. Envío a n8n
-        if webhook_url:
-            with open(archive_path, 'rb') as f:
-                files = {'file': ('clips_recortados.zip', f, 'application/zip')}
-                requests.post(webhook_url, files=files)
-
     except Exception as e:
-        print(f"Error en segundo plano: {str(e)}")
+        print(f"Error en el procesamiento: {str(e)}")
 
 @app.route('/download', methods=['POST'])
 def download_video():
@@ -111,7 +110,7 @@ def download_video():
     thread = threading.Thread(target=process_and_send, args=(url, webhook_url))
     thread.start()
 
-    return jsonify({"status": "processing", "message": "El proceso ha comenzado en segundo plano."}), 200
+    return jsonify({"status": "processing", "message": "El proceso ha comenzado. Los clips se enviarán secuencialmente."}), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
