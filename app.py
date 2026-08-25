@@ -60,7 +60,6 @@ def process_and_send(url, webhook_url):
         current_start = 0.0
         clip_index = 1
 
-        # Helper para recortar y enviar individualmente
         def recortar_y_enviar(inicio, fin):
             nonlocal clip_index
             clip_name = f'clip_{clip_index:03d}.mp4'
@@ -73,16 +72,16 @@ def process_and_send(url, webhook_url):
 
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            # Enviar el archivo individual al Webhook de n8n
+            # Enviar archivo individual a n8n
             if webhook_url and os.path.exists(out_clip):
                 with open(out_clip, 'rb') as f:
                     files = {'file': (clip_name, f, 'video/mp4')}
                     requests.post(webhook_url, files=files)
-                os.remove(out_clip) # Liberar memoria inmediatamente
+                os.remove(out_clip)
 
             clip_index += 1
 
-        # 3. Procesar y transmitir clip por clip
+        # 3. Procesar y enviar clip por clip
         for s_start, s_end in zip(starts, ends):
             duration = s_start - current_start
             if duration > 1.5:
