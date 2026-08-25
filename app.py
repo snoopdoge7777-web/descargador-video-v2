@@ -10,12 +10,12 @@ def descargar_video(youtube_url, output_path):
     youtube_url = youtube_url.lstrip("=")
     print(f"--> Descargando video en máxima calidad: {youtube_url}")
 
-    # Descarga en máxima calidad (1080p, 2K, 4K) combinando el mejor video y mejor audio
+    # Descarga la máxima calidad disponible (video + audio) sin restringir contenedor a mp4 inicial
     cmd = [
         'yt-dlp',
         '--cookies', 'cookies.txt',
-        '--extractor-args', 'youtube:player_client=ios,mweb',
-        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        '--extractor-args', 'youtube:player_client=web,mweb',
+        '-f', 'bv*+ba/b',
         '--no-playlist',
         '--merge-output-format', 'mp4',
         '-o', output_path,
@@ -25,12 +25,11 @@ def descargar_video(youtube_url, output_path):
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     
     if result.returncode != 0:
-        print(f"--> Falló intento 1. Reintentando con cliente android...")
+        print(f"--> Falló intento 1. Reintentando sin extractor-args...")
         cmd_alt = [
             'yt-dlp',
             '--cookies', 'cookies.txt',
-            '--extractor-args', 'youtube:player_client=android',
-            '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            '-f', 'bv*+ba/b',
             '--no-playlist',
             '--merge-output-format', 'mp4',
             '-o', output_path,
@@ -74,7 +73,7 @@ def process_video():
         starts = [float(x) for x in re.findall(r'silence_start: (\d+\.?\d*)', res_silence.stderr)]
         ends = [float(x) for x in re.findall(r'silence_end: (\d+\.?\d*)', res_silence.stderr)]
 
-        # 3. Generar clips independientes sin perder calidad (-c copy)
+        # 3. Generar clips independientes
         print("--> Recortando clips individuales...")
         current_start = 0.0
         clip_index = 1
@@ -87,7 +86,12 @@ def process_video():
             cmd = ['ffmpeg', '-y', '-ss', str(inicio)]
             if fin is not None:
                 cmd.extend(['-to', str(fin)])
-            cmd.extend(['-i', raw_path, '-c', 'copy', out_clip])
+            cmd.extend([
+                '-i', raw_path,
+                '-c:v', 'libx264', '-crf', '18', '-preset', 'ultrafast',
+                '-c:a', 'aac', '-b:a', '192k',
+                out_clip
+            ])
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             clip_index += 1
 
