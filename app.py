@@ -18,17 +18,18 @@ def process_and_send(url, webhook_url):
 
         raw_path = os.path.join(work_dir, 'input.mp4')
         
-        # Ruta robusta apuntando exactamente al archivo de cookies del repositorio
+        # Ruta al archivo de cookies en el repositorio
         cookie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www.youtube.com_cookies.txt')
 
+        # Configuración para Máxima Calidad + Bypass de JS Challenge
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
             'outtmpl': raw_path,
             'quiet': True,
             'extractor_args': {
                 'youtube': [
                     'player_client=ios,android,web',
-                    'nocheckcertificate'
+                    'remote_components=ejs:github'
                 ]
             }
         }
@@ -36,7 +37,7 @@ def process_and_send(url, webhook_url):
         if os.path.exists(cookie_path):
             ydl_opts['cookiefile'] = cookie_path
 
-        # 1. Descarga completa del video
+        # 1. Descarga del video en alta resolución
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
@@ -57,7 +58,7 @@ def process_and_send(url, webhook_url):
         current_start = 0.0
         clip_index = 1
 
-        # 3. Recorte de clips
+        # 3. Recorte ultra rápido sin perder calidad (-c copy)
         for s_start, s_end in zip(starts, ends):
             duration = s_start - current_start
             if duration > 1.5:
@@ -72,7 +73,7 @@ def process_and_send(url, webhook_url):
                 clip_index += 1
             current_start = s_end
 
-        # Último fragmento hasta el final
+        # Último fragmento
         subprocess.run([
             'ffmpeg', '-y',
             '-ss', str(current_start),
@@ -88,7 +89,7 @@ def process_and_send(url, webhook_url):
         if os.path.exists(raw_path):
             os.remove(raw_path)
 
-        # 5. Enviar el ZIP resultante al Webhook de n8n
+        # 5. Envío a n8n
         if webhook_url:
             with open(archive_path, 'rb') as f:
                 files = {'file': ('clips_recortados.zip', f, 'application/zip')}
@@ -106,11 +107,10 @@ def download_video():
     if not url:
         return {"status": "error", "message": "Falta la URL"}, 400
 
-    # Iniciar el proceso en segundo plano para liberar a Render y evitar timeouts
     thread = threading.Thread(target=process_and_send, args=(url, webhook_url))
     thread.start()
 
-    return jsonify({"status": "processing", "message": "El proceso ha comenzado en segundo plano."}), 200
+    return jsonify({"status": "processing", "message": "Procesando en segundo plano."}), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
