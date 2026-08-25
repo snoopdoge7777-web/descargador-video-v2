@@ -23,11 +23,12 @@ def download_video():
     raw_path = os.path.join(work_dir, 'input.mp4')
     cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
-    # Descarga directa en contenedor MP4 unificado (máxima calidad sin unir streams pesados en RAM)
+    # FUERZA 1080p o la máxima resolución disponible + audio de mejor calidad
     ydl_opts = {
-        'format': 'best[ext=mp4]/best',
+        'format': 'bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best',
         'outtmpl': raw_path,
         'quiet': True,
+        'merge_output_format': 'mp4',
         'extractor_args': {
             'youtube': ['player_client=ios,android,web']
         }
@@ -37,10 +38,11 @@ def download_video():
         ydl_opts['cookiefile'] = cookie_path
 
     try:
+        # 1. Descarga el stream de video HD y audio por separado y los une directamente al archivo
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        # Detectar silencios
+        # 2. Detección de silencios rápida
         silence_cmd = [
             'ffmpeg', '-i', raw_path,
             '-af', 'silencedetect=noise=-30dB:d=0.8',
@@ -57,7 +59,7 @@ def download_video():
         current_start = 0.0
         clip_index = 1
 
-        # CORTAR SIN RE-ENCODEAR (-c copy): 0% consumo de CPU/RAM extras
+        # 3. Recorte relámpago con "-c copy" (mantiene los 1080p intactos sin usar RAM/CPU)
         for s_start, s_end in zip(starts, ends):
             duration = s_start - current_start
             if duration > 1.5:
@@ -72,7 +74,7 @@ def download_video():
                 clip_index += 1
             current_start = s_end
 
-        # Último clip
+        # Último segmento
         subprocess.run([
             'ffmpeg', '-y',
             '-ss', str(current_start),
@@ -81,7 +83,7 @@ def download_video():
             os.path.join(clips_dir, f'clip_{clip_index:03d}.mp4')
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # Crear ZIP y limpiar
+        # 4. Crear el paquete ZIP final
         zip_path = '/tmp/clips_recortados'
         archive_path = shutil.make_archive(zip_path, 'zip', clips_dir)
 
