@@ -1,15 +1,7 @@
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    unzip \
-    nodejs \
-    ca-certificates \
-    ffmpeg \
-    && curl -fsSL https://deno.land/install.sh | sh \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV PATH="/root/.deno/bin:$PATH"
+# Instalar dependencias del sistema (ffmpeg)
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -20,4 +12,5 @@ COPY . .
 
 EXPOSE 10000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "--timeout", "180", "app:app"]
+# Comando con timeout ampliado para evitar cortes
+CMD ["gunicorn", "app:app", "--timeout", "900", "--bind", "0.0.0.0:10000"]
