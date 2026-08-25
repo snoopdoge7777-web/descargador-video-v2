@@ -9,6 +9,7 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 def descargar_con_cobalt(youtube_url, output_path):
+    print(f"--> Iniciando descarga desde Cobalt para: {youtube_url}")
     url_api = "https://api.cobalt.tools/api/json"
     headers = {
         "Accept": "application/json",
@@ -25,11 +26,13 @@ def descargar_con_cobalt(youtube_url, output_path):
     if not stream_url:
         raise Exception(f"Error con Cobalt: {data}")
 
+    print("--> Cobalt generó el enlace. Descargando archivo MP4...")
     with requests.get(stream_url, stream=True) as r:
         r.raise_for_status()
         with open(output_path, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
+    print("--> Descarga completada con éxito.")
 
 def process_and_send(url, webhook_url):
     work_dir = '/tmp/clips'
@@ -44,6 +47,7 @@ def process_and_send(url, webhook_url):
         descargar_con_cobalt(url, raw_path)
 
         # 2. Análisis de silencios con FFmpeg
+        print("--> Analizando silencios en el video con FFmpeg...")
         silence_cmd = [
             'ffmpeg', '-i', raw_path,
             '-af', 'silencedetect=noise=-30dB:d=0.8',
@@ -74,14 +78,19 @@ def process_and_send(url, webhook_url):
 
             # Enviar archivo individual a n8n
             if webhook_url and os.path.exists(out_clip):
+                print(f"--> Enviando {clip_name} al Webhook de n8n ({webhook_url})...")
                 with open(out_clip, 'rb') as f:
-                    files = {'file': (clip_name, f, 'video/mp4')}
-                    requests.post(webhook_url, files=files)
+                    files = {'data': (clip_name, f, 'video/mp4')}
+                    response = requests.post(webhook_url, files=files)
+                    print(f"--> Estado de envío para {clip_name}: {response.status_code}")
                 os.remove(out_clip)
+            elif not webhook_url:
+                print(f"--> ADVERTENCIA: No se recibió webhook_url. {clip_name} no fue enviado.")
 
             clip_index += 1
 
         # 3. Procesar y enviar clip por clip
+        print("--> Recortando y enviando clips secuencialmente...")
         for s_start, s_end in zip(starts, ends):
             duration = s_start - current_start
             if duration > 1.5:
@@ -93,18 +102,26 @@ def process_and_send(url, webhook_url):
 
         if os.path.exists(raw_path):
             os.remove(raw_path)
+            
+        print("--> ¡Proceso finalizado correctamente!")
 
     except Exception as e:
-        print(f"Error en el procesamiento: {str(e)}")
+        print(f"--> ERROR CRÍTICO en el procesamiento: {str(e)}")
 
 @app.route('/download', methods=['POST'])
 def download_video():
-    data = request.get_json()
-    url = data.get('url')
-    webhook_url = data.get('webhook_url')
+    data = request.get_json() or {}
     
+    # Busca 'url' o 'targetUrl' (según cómo lo mande n8n)
+    url = data.get('url') or data.get('targetUrl')
+    
+    # Busca 'webhook_url' o 'webhookUrl'
+    webhook_url = data.get('webhook_url') or data.get('webhookUrl')
+    
+    print(f"--> Petición recibida en /download. URL: {url} | Webhook: {webhook_url}")
+
     if not url:
-        return {"status": "error", "message": "Falta la URL"}, 400
+        return jsonify({"status": "error", "message": "Falta la URL del video"}), 400
 
     thread = threading.Thread(target=process_and_send, args=(url, webhook_url))
     thread.start()
