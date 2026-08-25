@@ -9,13 +9,14 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 def descargar_video(youtube_url, output_path):
-    # Limpiar URL si viene con signo '=' al principio desde n8n
+    # Limpiar URL por si viene con signo '=' al principio desde n8n
     youtube_url = youtube_url.lstrip("=")
-    print(f"--> Descargando video con yt-dlp: {youtube_url}")
+    print(f"--> Descargando video con yt-dlp usando cliente movil: {youtube_url}")
 
-    # Intentar descarga primaria con yt-dlp (máxima compatibilidad y calidad hasta 1080p)
+    # Forzar el cliente 'ios' y 'mweb' para saltear la verificacion de bot/login de YouTube en servidores cloud
     cmd = [
         'yt-dlp',
+        '--extractor-args', 'youtube:player_client=ios,mweb',
         '-f', 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         '--no-playlist',
         '--merge-output-format', 'mp4',
@@ -26,30 +27,23 @@ def descargar_video(youtube_url, output_path):
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     
     if result.returncode != 0:
-        print(f"--> Error con yt-dlp: {result.stderr}")
-        # Intento de respaldo con la nueva API v10 de Cobalt
-        print("--> Intentando respaldo con la nueva API de Cobalt v10...")
-        url_api = "https://api.cobalt.tools/"
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "url": youtube_url,
-            "videoQuality": "1080"
-        }
-        res = requests.post(url_api, json=payload, headers=headers, timeout=30)
-        data = res.json()
-        stream_url = data.get("url")
+        print(f"--> Intento 1 fallido: {result.stderr}")
+        print("--> Reintentando con cliente 'android'...")
         
-        if not stream_url:
-            raise Exception(f"No se pudo descargar el video. Fallaron yt-dlp y Cobalt: {data}")
-
-        with requests.get(stream_url, stream=True) as r:
-            r.raise_for_status()
-            with open(output_path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
+        # Segundo intento con cliente android de respaldo
+        cmd_alt = [
+            'yt-dlp',
+            '--extractor-args', 'youtube:player_client=android',
+            '-f', 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            '--no-playlist',
+            '--merge-output-format', 'mp4',
+            '-o', output_path,
+            youtube_url
+        ]
+        res_alt = subprocess.run(cmd_alt, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        if res_alt.returncode != 0:
+            raise Exception(f"No se pudo descargar de YouTube: {res_alt.stderr}")
 
     print("--> Descarga completada con éxito.")
 
