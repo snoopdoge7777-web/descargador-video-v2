@@ -23,19 +23,19 @@ def download_video():
 
     raw_path = os.path.join(work_dir, 'input.mp4')
     
-    # Nombre de tu archivo de cookies en el directorio del proyecto
     cookie_path = os.path.join(os.path.dirname(__file__), 'cookies.txt')
     if not os.path.exists(cookie_path):
         cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
+    # Configuración de alta calidad con fallback de clientes
     ydl_opts = {
-        # 'bv*+ba/b' fuerza la descarga de la máxima calidad de video + audio disponible
-        'format': 'bv*+ba/b',
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
         'outtmpl': raw_path,
         'merge_output_format': 'mp4',
         'quiet': True,
+        'nocheckcertificate': True,
         'extractor_args': {
-            'youtube': ['player_client=ios,web,tv']
+            'youtube': ['player_client=mweb,web,tv']
         }
     }
 
@@ -43,9 +43,15 @@ def download_video():
         ydl_opts['cookiefile'] = cookie_path
 
     try:
-        # 1. Descargar video en máxima resolución
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        # 1. Descargar video en alta resolución
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+        except Exception:
+            # Fallback en caso de bloqueo de cliente
+            ydl_opts['extractor_args'] = {'youtube': ['player_client=ios']}
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
 
         # 2. Detectar marcas de silencio con ffmpeg
         silence_cmd = [
@@ -58,7 +64,7 @@ def download_video():
         starts = [float(x) for x in re.findall(r'silence_start: (\d+\.?\d*)', result.stderr)]
         ends = [float(x) for x in re.findall(r'silence_end: (\d+\.?\d*)', result.stderr)]
 
-        # 3. Recortar en clips independientes descartando el silencio (manteniendo calidad con -c copy)
+        # 3. Recortar en clips independientes
         clips_dir = os.path.join(work_dir, 'output')
         os.makedirs(clips_dir, exist_ok=True)
 
@@ -67,7 +73,7 @@ def download_video():
 
         for s_start, s_end in zip(starts, ends):
             duration = s_start - current_start
-            if duration > 1.5:  # Filtra clips muy cortos
+            if duration > 1.5:
                 out_clip = os.path.join(clips_dir, f'clip_{clip_index:03d}.mp4')
                 subprocess.run([
                     'ffmpeg', '-y', '-ss', str(current_start), '-to', str(s_start),
@@ -76,13 +82,13 @@ def download_video():
                 clip_index += 1
             current_start = s_end
 
-        # Último clip desde el último silencio hasta el final
+        # Último clip
         subprocess.run([
             'ffmpeg', '-y', '-ss', str(current_start),
             '-i', raw_path, '-c', 'copy', os.path.join(clips_dir, f'clip_{clip_index:03d}.mp4')
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 4. Empaquetar en un archivo ZIP
+        # 4. Empaquetar en ZIP
         zip_path = '/tmp/clips_recortados'
         archive_path = shutil.make_archive(zip_path, 'zip', clips_dir)
 
