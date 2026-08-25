@@ -1,13 +1,13 @@
 FROM python:3.11-slim
 
-# Instalar ffmpeg, curl y unzip
+# Instalar FFmpeg y dependencias básicas
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Deno
+# Instalar Deno para resolver retos JS
 RUN curl -fsSL https://deno.land/install.sh | sh
 ENV PATH="/root/.deno/bin:$PATH"
 
@@ -17,7 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Pre-descargar el solucionador de retos JS para yt-dlp
+# Habilitar y pre-descargar el componente EJS de yt-dlp globalmente
 RUN yt-dlp --remote-components ejs:github --version || true
 
 COPY . .
