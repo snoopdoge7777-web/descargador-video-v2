@@ -27,15 +27,14 @@ def download_video():
     if not os.path.exists(cookie_path):
         cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
-    # Usamos un selector que prefiere archivos ya combinados (mp4) para evitar fallos de mezcla
+    # Sin 'format' estricto: usa el formato progresivo predeterminado más compatible para servidores cloud
     ydl_opts = {
-        'format': 'best[ext=mp4]/best',
         'outtmpl': raw_path,
         'quiet': True,
         'nocheckcertificate': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web', 'mweb', 'android']
+                'player_client': ['android', 'web']
             }
         },
         'http_headers': {
@@ -51,7 +50,7 @@ def download_video():
         # 1. Asegurar yt-dlp actualizado
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 2. Descargar el video
+        # 2. Descargar el video de forma segura
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
