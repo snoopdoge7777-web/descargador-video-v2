@@ -23,7 +23,6 @@ def download_video():
 
     raw_path = os.path.join(work_dir, 'input.mp4')
     
-    # Rutas posibles donde podría estar el archivo de cookies
     base_dir = os.path.dirname(os.path.abspath(__file__))
     possible_cookie_paths = [
         os.path.join(base_dir, 'www.youtube.com_cookies.txt'),
@@ -51,13 +50,11 @@ def download_video():
 
     if cookie_path:
         ydl_opts['cookiefile'] = cookie_path
-        print(f"Usando archivo de cookies en: {cookie_path}")
-    else:
-        print("¡ADVERTENCIA: No se encontró ningún archivo de cookies en el servidor!")
 
     try:
-        # 1. Asegurar yt-dlp actualizado
+        # 1. Forzar actualización completa de yt-dlp y sus componentes remotos al iniciar la petición
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['yt-dlp', '--update-to', 'stable'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # 2. Descargar video
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
