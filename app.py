@@ -28,9 +28,10 @@ def download_video():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     cookie_path = os.path.join(base_dir, 'www.youtube.com_cookies.txt')
 
-    # Configuración avanzada con soporte de componentes remotos (EJS) para saltar el bloqueo
+    # Solución de formato abierto y tolerante a fallos
     ydl_opts = {
-        'format': 'best',
+        'format': 'best/bestvideo+bestaudio',
+        'merge_output_format': 'mp4',
         'outtmpl': raw_path,
         'quiet': True,
         'nocheckcertificate': True,
@@ -52,10 +53,10 @@ def download_video():
         ydl_opts['cookiefile'] = cookie_path
 
     try:
-        # 1. Asegurar yt-dlp actualizado a la última versión
+        # 1. Asegurar yt-dlp actualizado
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 2. Descargar video utilizando el resolvedor de retos EJS
+        # 2. Descargar video con el selector flexible
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
@@ -79,7 +80,7 @@ def download_video():
 
         for s_start, s_end in zip(starts, ends):
             duration = s_start - current_start
-            if duration > 1.5:  # Filtra clips muy cortos
+            if duration > 1.5:  
                 out_clip = os.path.join(clips_dir, f'clip_{clip_index:03d}.mp4')
                 subprocess.run([
                     'ffmpeg', '-y', '-ss', str(current_start), '-to', str(s_start),
