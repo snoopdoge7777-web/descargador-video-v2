@@ -9,8 +9,11 @@ app = Flask(__name__)
 
 @app.route('/download', methods=['POST'])
 def download_video():
-    data = request.get_json()
-    url = data.get('url')
+    data = request.get_json() or {}
+    url = data.get('url') or data.get('targetUrl') or ""
+    
+    # --- SOLUCIÓN: Limpiar caracteres extra o '=' que mande n8n al inicio ---
+    url = url.strip().lstrip("=")
     
     if not url:
         return {"status": "error", "message": "Falta la URL"}, 400
