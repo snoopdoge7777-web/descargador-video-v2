@@ -28,20 +28,13 @@ def download_video():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     cookie_path = os.path.join(base_dir, 'www.youtube.com_cookies.txt')
 
-    # Solución de formato abierto y tolerante a fallos
+    # Configuración ultraligera sin restricciones de formato rígidas
     ydl_opts = {
-        'format': 'best/bestvideo+bestaudio',
-        'merge_output_format': 'mp4',
         'outtmpl': raw_path,
         'quiet': True,
         'nocheckcertificate': True,
         'remote_components': {
             'ejs': 'github'
-        },
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web', 'mweb', 'android']
-            }
         },
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -56,7 +49,7 @@ def download_video():
         # 1. Asegurar yt-dlp actualizado
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 2. Descargar video con el selector flexible
+        # 2. Descargar video con el selector por defecto (el más compatible que existe)
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
