@@ -27,9 +27,9 @@ def download_video():
     if not os.path.exists(cookie_path):
         cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
-    # Opciones con bypass avanzado para evitar la restricción de recarga de página
+    # Selector flexible que asegura máximo 720p sin fallar por formatos faltantes
     ydl_opts = {
-        'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/22/18',
+        'format': 'bv*[height<=720]+ba/b[height<=720]/best',
         'outtmpl': raw_path,
         'merge_output_format': 'mp4',
         'quiet': True,
@@ -49,10 +49,10 @@ def download_video():
         ydl_opts['cookiefile'] = cookie_path
 
     try:
-        # 1. Forzar actualización estricta de yt-dlp al inicio de cada petición
+        # 1. Asegurar yt-dlp actualizado
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 2. Descargar video en 720p
+        # 2. Descargar video
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
