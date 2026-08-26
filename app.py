@@ -27,14 +27,19 @@ def download_video():
     if not os.path.exists(cookie_path):
         cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
-    # Usamos 'best' de forma pura para que elija automáticamente el mejor formato accesible sin fallos
+    # Usamos el cliente 'ios' que evita el error de "The page needs to be reloaded"
     ydl_opts = {
         'format': 'best',
         'outtmpl': raw_path,
         'quiet': True,
         'nocheckcertificate': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'web']
+            }
+        },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
             'Accept-Language': 'en-US,en;q=0.9',
         }
     }
@@ -43,10 +48,10 @@ def download_video():
         ydl_opts['cookiefile'] = cookie_path
 
     try:
-        # 1. Asegurar yt-dlp actualizado a su última versión
+        # 1. Asegurar yt-dlp actualizado a la versión más reciente que soluciona este bloqueo
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 2. Descargar el video de forma robusta
+        # 2. Descargar el video
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
