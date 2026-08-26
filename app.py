@@ -9,9 +9,8 @@ app = Flask(__name__)
 
 @app.route('/download', methods=['POST'])
 def download_video():
-    data = request.get_json() or {}
-    url = data.get('url') or data.get('targetUrl') or ""
-    url = url.lstrip("=")
+    data = request.get_json()
+    url = data.get('url')
     
     if not url:
         return {"status": "error", "message": "Falta la URL"}, 400
@@ -22,25 +21,14 @@ def download_video():
     os.makedirs(work_dir, exist_ok=True)
 
     raw_path = os.path.join(work_dir, 'input.mp4')
-    
-    cookie_path = os.path.join(os.path.dirname(__file__), 'cookies.txt')
-    if not os.path.exists(cookie_path):
-        cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
+    cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
-    # Usamos el cliente 'ios' que evita el error de "The page needs to be reloaded"
     ydl_opts = {
         'format': 'best',
         'outtmpl': raw_path,
         'quiet': True,
-        'nocheckcertificate': True,
         'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'web']
-            }
-        },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'youtube': ['player_client=ios,android,web']
         }
     }
 
@@ -48,14 +36,11 @@ def download_video():
         ydl_opts['cookiefile'] = cookie_path
 
     try:
-        # 1. Asegurar yt-dlp actualizado a la versión más reciente que soluciona este bloqueo
-        subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        # 2. Descargar el video
+        # 1. Descargar video en formato estable pre-combinado
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        # 3. Detectar marcas de silencio con ffmpeg
+        # 2. Detectar marcas de silencio con ffmpeg
         silence_cmd = [
             'ffmpeg', '-i', raw_path,
             '-af', 'silencedetect=noise=-30dB:d=0.8',
@@ -66,7 +51,7 @@ def download_video():
         starts = [float(x) for x in re.findall(r'silence_start: (\d+\.?\d*)', result.stderr)]
         ends = [float(x) for x in re.findall(r'silence_end: (\d+\.?\d*)', result.stderr)]
 
-        # 4. Recortar en clips independientes descartando el silencio
+        # 3. Recortar en clips independientes descartando el silencio
         clips_dir = os.path.join(work_dir, 'output')
         os.makedirs(clips_dir, exist_ok=True)
 
@@ -75,7 +60,7 @@ def download_video():
 
         for s_start, s_end in zip(starts, ends):
             duration = s_start - current_start
-            if duration > 1.5:
+            if duration > 1.5:  # Filtra clips muy cortos
                 out_clip = os.path.join(clips_dir, f'clip_{clip_index:03d}.mp4')
                 subprocess.run([
                     'ffmpeg', '-y', '-ss', str(current_start), '-to', str(s_start),
@@ -90,7 +75,7 @@ def download_video():
             '-i', raw_path, '-c', 'copy', os.path.join(clips_dir, f'clip_{clip_index:03d}.mp4')
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 5. Empaquetar en un archivo ZIP
+        # 4. Empaquetar en un archivo ZIP
         zip_path = '/tmp/clips_recortados'
         archive_path = shutil.make_archive(zip_path, 'zip', clips_dir)
 
@@ -100,5 +85,4 @@ def download_video():
         return {"status": "error", "message": f"Error de proceso: {str(e)}"}, 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=10000)
