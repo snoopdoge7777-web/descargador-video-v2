@@ -27,11 +27,10 @@ def download_video():
     if not os.path.exists(cookie_path):
         cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
-    # Selector flexible que asegura máximo 720p sin fallar por formatos faltantes
+    # Usar 'best' evita por completo el error de formato no disponible
     ydl_opts = {
-        'format': 'bv*[height<=720]+ba/b[height<=720]/best',
+        'format': 'best',
         'outtmpl': raw_path,
-        'merge_output_format': 'mp4',
         'quiet': True,
         'nocheckcertificate': True,
         'extractor_args': {
@@ -52,7 +51,7 @@ def download_video():
         # 1. Asegurar yt-dlp actualizado
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 2. Descargar video
+        # 2. Descargar el mejor formato disponible sin restricciones estrictas
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
