@@ -11,8 +11,6 @@ app = Flask(__name__)
 def download_video():
     data = request.get_json() or {}
     url = data.get('url') or data.get('targetUrl') or ""
-    
-    # Limpiar cualquier caracter extra o '=' al inicio
     url = url.strip().lstrip("=")
     
     if not url:
@@ -25,10 +23,19 @@ def download_video():
 
     raw_path = os.path.join(work_dir, 'input.mp4')
     
+    # Rutas posibles donde podría estar el archivo de cookies
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    cookie_path = os.path.join(base_dir, 'www.youtube.com_cookies.txt')
+    possible_cookie_paths = [
+        os.path.join(base_dir, 'www.youtube.com_cookies.txt'),
+        os.path.join(base_dir, 'cookies.txt')
+    ]
+    
+    cookie_path = None
+    for p in possible_cookie_paths:
+        if os.path.exists(p):
+            cookie_path = p
+            break
 
-    # Configuración ultraligera sin restricciones de formato rígidas
     ydl_opts = {
         'outtmpl': raw_path,
         'quiet': True,
@@ -42,14 +49,17 @@ def download_video():
         }
     }
 
-    if os.path.exists(cookie_path):
+    if cookie_path:
         ydl_opts['cookiefile'] = cookie_path
+        print(f"Usando archivo de cookies en: {cookie_path}")
+    else:
+        print("¡ADVERTENCIA: No se encontró ningún archivo de cookies en el servidor!")
 
     try:
         # 1. Asegurar yt-dlp actualizado
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 2. Descargar video con el selector por defecto (el más compatible que existe)
+        # 2. Descargar video
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
