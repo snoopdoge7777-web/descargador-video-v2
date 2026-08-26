@@ -27,8 +27,9 @@ def download_video():
     if not os.path.exists(cookie_path):
         cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
-    # Sin 'format' estricto: usa el formato progresivo predeterminado más compatible para servidores cloud
+    # Forzar el formato 18 (360p estándar con audio y video juntos) o el mejor disponible sin mezcla
     ydl_opts = {
+        'format': '18 / best',
         'outtmpl': raw_path,
         'quiet': True,
         'nocheckcertificate': True,
@@ -50,7 +51,7 @@ def download_video():
         # 1. Asegurar yt-dlp actualizado
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 2. Descargar el video de forma segura
+        # 2. Descargar el video de forma garantizada
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
