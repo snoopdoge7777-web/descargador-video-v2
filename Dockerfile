@@ -1,14 +1,16 @@
 FROM python:3.11-slim
 
-# Instalar dependencias del sistema (ffmpeg, curl, unzip)
+# Instalar dependencias del sistema (ffmpeg, curl, unzip, nodejs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
     curl \
     unzip \
+    nodejs \
+    ca-certificates \
+    ffmpeg \
+    && curl -fsSL https://deno.land/install.sh | sh \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Deno (necesario para que yt-dlp resuelva los retos de JavaScript de YouTube)
-RUN curl -fsSL https://deno.land/install.sh | sh
+# Configurar el PATH para Deno
 ENV PATH="/root/.deno/bin:$PATH"
 
 WORKDIR /app
@@ -18,7 +20,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copiar el resto del código
+# Copiar el resto del código del proyecto
 COPY . .
 
-CMD gunicorn -w 1 -b 0.0.0.0:10000 app:app
+EXPOSE 10000
+
+# Comando con timeout de 300 segundos (5 min) y 1 solo worker para optimizar la RAM en Render
+CMD ["gunicorn", "-w", "1", "--bind", "0.0.0.0:10000", "--timeout", "300", "app:app"]
