@@ -27,8 +27,9 @@ def download_video():
     if not os.path.exists(cookie_path):
         cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
-    # Opciones sin restricción de formato para evitar errores de streams faltantes
+    # Usamos un selector que prefiere archivos ya combinados (mp4) para evitar fallos de mezcla
     ydl_opts = {
+        'format': 'best[ext=mp4]/best',
         'outtmpl': raw_path,
         'quiet': True,
         'nocheckcertificate': True,
@@ -50,7 +51,7 @@ def download_video():
         # 1. Asegurar yt-dlp actualizado
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # 2. Descargar el video usando la selección automática de yt-dlp
+        # 2. Descargar el video
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
