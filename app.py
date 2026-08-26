@@ -27,15 +27,17 @@ def download_video():
     if not os.path.exists(cookie_path):
         cookie_path = os.path.join(os.path.dirname(__file__), 'www.youtube.com_cookies.txt')
 
+    # Opciones actualizadas para evitar el bloqueo "The page needs to be reloaded"
     ydl_opts = {
         'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/22/18',
         'outtmpl': raw_path,
         'merge_output_format': 'mp4',
         'quiet': True,
         'nocheckcertificate': True,
-        # Cambiamos el cliente para evitar el bloqueo de página recargada
         'extractor_args': {
-            'youtube': ['player_client=web,mweb']
+            'youtube': {
+                'player_client': ['tv', 'android']
+            }
         }
     }
 
@@ -43,7 +45,7 @@ def download_video():
         ydl_opts['cookiefile'] = cookie_path
 
     try:
-        # 1. Actualizar yt-dlp automáticamente en cada ejecución para evitar bloqueos de YouTube
+        # 1. Asegurar la última versión de yt-dlp en el servidor
         subprocess.run(['pip', 'install', '--upgrade', 'yt-dlp'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # 2. Descargar video en 720p
