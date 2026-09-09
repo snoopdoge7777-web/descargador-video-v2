@@ -5,7 +5,7 @@ import subprocess
 import numpy as np
 from flask import Flask, request, send_file, jsonify
 
-# Forzar actualización de yt-dlp al vuelo para evitar bloqueos de YouTube
+# Forzar actualización de yt-dlp al inicio
 subprocess.run(["pip", "install", "--upgrade", "yt-dlp"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 import yt_dlp
@@ -34,12 +34,12 @@ def download_video():
     url = data['url']
     temp_dir = tempfile.mkdtemp()
     
-    # Opciones robustas con clientes múltiples para evitar bloqueos de player response
+    # Configuración avanzada para saltar restricciones de YouTube en servidores
     ydl_base_opts = {
         'noplaylist': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web', 'mweb', 'android']
+                'player_client': ['tv_embedded', 'android', 'web']
             }
         },
         'quiet': True
