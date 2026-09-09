@@ -13,7 +13,6 @@ def download_video():
 
     url = data['url']
 
-    # Directorio temporal para almacenar la descarga
     temp_dir = tempfile.mkdtemp()
     output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
@@ -21,10 +20,10 @@ def download_video():
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': output_template,
         
-        # Archivo de cookies tal cual lo tienes en GitHub
+        # Archivo de cookies registrado en tu repositorio
         'cookiefile': 'www.youtube.com_cookies.txt',
         
-        # Clientes que SÍ soportan cookies y evitan el salto/omisión en logs
+        # Selección de clientes para la extracción de video
         'extractor_args': {
             'youtube': {
                 'player_client': ['tv_embedded', 'web', 'mweb']
@@ -39,7 +38,6 @@ def download_video():
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        # Retorna el archivo descargado hacia el nodo HTTP Request de n8n
         return send_file(filename, as_attachment=True)
 
     except Exception as e:
