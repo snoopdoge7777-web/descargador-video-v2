@@ -16,27 +16,17 @@ def download_video():
     temp_dir = tempfile.mkdtemp()
     output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
+    # Toma la URL del proxy cargada en Render
+    proxy_url = os.environ.get('PROXY_URL')
+
     ydl_opts = {
-        # 1. Solicita un solo formato combinado para no hacer peticiones dobles de audio/video
         'format': 'b/best[ext=mp4]/best',
         'outtmpl': output_template,
-        
-        # 2. Tu archivo de cookies recargado
         'cookiefile': 'www.youtube.com_cookies.txt',
-        
-        # 3. Evita procesar listas de reproducción enteras
         'noplaylist': True,
-        
-        # 4. Reduce peticiones secundarias
-        'writethumbnail': False,
-        'writeinfojson': False,
-        'ignoreerrors': False,
-        
-        # 5. Restringe las consultas a un solo cliente móvil liviano para minimizar llamadas a la API
         'extractor_args': {
             'youtube': {
-                'player_client': ['mweb'],
-                'skip': ['dash', 'hls']  # Salta fragmentación innecesaria
+                'player_client': ['tv_embedded', 'web', 'mweb']
             },
             'youtubetab': {
                 'skip': ['authcheck']
@@ -45,6 +35,10 @@ def download_video():
         'quiet': False,
         'no_warnings': False,
     }
+
+    # Si la variable existe en Render, se asigna el proxy
+    if proxy_url:
+        ydl_opts['proxy'] = proxy_url
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
