@@ -8,17 +8,13 @@ from googleapiclient.http import MediaFileUpload
 
 app = Flask(__name__)
 
-# Configuración de Google Drive (Lee las credenciales desde una variable de entorno en Render)
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
 def upload_to_drive(file_path, file_name):
-    """Sube el archivo descargado a Google Drive y retorna el enlace web."""
-    # Puedes guardar tus credenciales de Service Account en una variable de entorno llamada GOOGLE_CREDENTIALS_JSON
     creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
     if not creds_json:
         raise Exception("Falta la variable de entorno GOOGLE_CREDENTIALS_JSON")
 
-    # Guardar temporalmente el JSON de credenciales
     creds_path = '/tmp/credentials.json'
     with open(creds_path, 'w') as f:
         f.write(creds_json)
@@ -31,7 +27,6 @@ def upload_to_drive(file_path, file_name):
 
     file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
     
-    # Limpiar archivo temporal de credenciales
     if os.path.exists(creds_path):
         os.remove(creds_path)
 
@@ -45,49 +40,45 @@ def download_video():
 
     url = data['url']
     temp_dir = tempfile.mkdtemp()
-    output_template = os.path.join(temp_dir, 'source_video.mp4')
+    output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
     proxy_url = os.environ.get('PROXY_URL')
 
-    # Opciones de yt-dlp seguras y limitadas a 720p para cuidar la RAM de Render
     ydl_opts = {
-        'format': 'b[height<=720]/best[height<=720]/b/best',
+        'format': 'b/best[ext=mp4]/best',
         'outtmpl': output_template,
         'noplaylist': True,
-        'merge_output_format': 'mp4',
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web']
+                'player_client': ['tv_embedded', 'web', 'mweb']
+            },
+            'youtubetab': {
+                'skip': ['authcheck']
             }
         },
-        'quiet': True
+        'quiet': False,
+        'no_warnings': False,
     }
 
     if proxy_url:
         ydl_opts['proxy'] = proxy_url
 
     try:
-        # 1. Descargar el video de YouTube en Render
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
 
-        if not os.path.exists(output_template):
-            # Buscar si se guardó con otra extensión por el merge
-            files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.mp4')]
-            if files:
-                output_template = files[0]
-            else:
-                return jsonify({'status': 'error', 'message': 'No se pudo descargar el video'}), 500
+        if not os.path.exists(filename):
+            return jsonify({'status': 'error', 'message': 'No se pudo descargar el archivo'}), 500
 
-        # 2. Subir directamente a Google Drive
-        file_name = f"youtube_video_{os.path.basename(output_template)}"
-        web_link, file_id = upload_to_drive(output_template, file_name)
+        # Subir a Google Drive
+        file_name = os.path.basename(filename)
+        web_link, file_id = upload_to_drive(filename, file_name)
 
-        # 3. Borrar el video localmente en Render para liberar espacio/RAM de inmediato
-        if os.path.exists(output_template):
-            os.remove(output_template)
+        # Limpiar archivo local para liberar espacio en Render
+        if os.path.exists(filename):
+            os.remove(filename)
 
-        # 4. Devolver la URL de Drive a n8n
         return jsonify({
             'status': 'success',
             'drive_url': web_link,
