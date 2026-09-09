@@ -97,18 +97,15 @@ def download_video():
 
     proxy_url = os.environ.get('PROXY_URL')
 
-    # Regla ultra permisiva de formatos
+    # Configuración todoterreno para yt-dlp
     ydl_opts = {
-        'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+        'format': 'b/best', # Descarga directa del mejor stream combinado sin filtros estrictos
         'outtmpl': video_path,
         'noplaylist': True,
         'merge_output_format': 'mp4',
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web', 'mweb', 'tv_embedded']
-            },
-            'youtubetab': {
-                'skip': ['authcheck']
+                'player_client': ['android', 'ios']
             }
         },
         'quiet': False
