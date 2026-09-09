@@ -1,28 +1,51 @@
-{
-  "errorMessage": "The service was not able to process your request",
-  "errorDescription": "Error de proceso: ERROR: [youtube:tab] RD0mYBSayCsH0: Playlists that require authentication may not extract correctly without a successful webpage download. If you are not downloading private content, or your cookies are only for the first account and channel, pass \"--extractor-args youtubetab:skip=authcheck\" to skip this check",
-  "errorDetails": {
-    "rawErrorMessage": [
-      "500 - \"{\\\"message\\\":\\\"Error de proceso: ERROR: [youtube:tab] RD0mYBSayCsH0: Playlists that require authentication may not extract correctly without a successful webpage download. If you are not downloading private content, or your cookies are only for the first account and channel, pass \\\\\\\"--extractor-args youtubetab:skip=authcheck\\\\\\\" to skip this check\\\",\\\"status\\\":\\\"error\\\"}\\n\""
-    ],
-    "httpCode": "500"
-  },
-  "n8nDetails": {
-    "nodeName": "HTTP Request",
-    "nodeType": "n8n-nodes-base.httpRequest",
-    "nodeVersion": 4.5,
-    "itemIndex": 0,
-    "time": "9/9/2026, 22:47:38",
-    "n8nVersion": "2.39.0 (Cloud)",
-    "binaryDataMode": "filesystem",
-    "stackTrace": [
-      "NodeApiError: The service was not able to process your request",
-      "    at ExecuteContext.execute (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-nodes-base@file++++home+runner+_work+n8n+n8n+packages+nodes-base/node_modules/n8n-nodes-base/nodes/HttpRequest/V3/HttpRequestV3.node.ts:890:16)",
-      "    at processTicksAndRejections (node:internal/process/task_queues:104:5)",
-      "    at WorkflowExecute.executeNode (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file++++home+runner+_work+n8n+n8n+packages+core/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:1125:8)",
-      "    at WorkflowExecute.runNode (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file++++home+runner+_work+n8n+n8n+packages+core/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:1427:11)",
-      "    at /usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file++++home+runner+_work+n8n+n8n+packages+core/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:2329:27",
-      "    at /usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file++++home+runner+_work+n8n+n8n+packages+core/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:2810:11"
-    ]
-  }
-}
+import os
+import tempfile
+from flask import Flask, request, send_file, jsonify
+import yt_dlp
+
+app = Flask(__name__)
+
+@app.route('/download', methods=['POST'])
+def download_video():
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({'status': 'error', 'message': 'Falta el parámetro url'}), 400
+
+    url = data['url']
+
+    temp_dir = tempfile.mkdtemp()
+    output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
+
+    ydl_opts = {
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'outtmpl': output_template,
+        'cookiefile': 'www.youtube.com_cookies.txt',
+        'noplaylist': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['tv_embedded', 'web', 'mweb']
+            },
+            'youtubetab': {
+                'skip': ['authcheck']
+            }
+        },
+        'quiet': False,
+        'no_warnings': False,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+
+        return send_file(filename, as_attachment=True)
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error de proceso: {str(e)}'
+        }), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
