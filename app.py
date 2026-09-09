@@ -4,7 +4,13 @@ import zipfile
 import numpy as np
 from flask import Flask, request, send_file, jsonify
 import yt_dlp
-from moviepy.editor import VideoFileClip, CompositeVideoClip, vfx
+
+# Manejo de compatibilidad para MoviePy v1 y v2
+try:
+    from moviepy.editor import VideoFileClip, CompositeVideoClip, vfx
+except ModuleNotFoundError:
+    from moviepy import VideoFileClip, CompositeVideoClip, vfx
+
 from pydub import AudioSegment
 
 app = Flask(__name__)
