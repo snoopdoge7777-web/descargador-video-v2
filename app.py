@@ -17,17 +17,17 @@ def download_video():
 
     proxy_url = os.environ.get('PROXY_URL')
 
-    # Definir un rango de corte (Ejemplo: desde el segundo 30 hasta el 45)
+    # Rango de tiempo para el corte (puedes parametrizarlo o dejarlo fijo por ahora)
     start_time = 30
     end_time = 45
 
     ydl_opts = {
-        'format': 'b[height<=720]/best[height<=720]/b/best',
+        # Busca la mejor calidad disponible pero limita estrictamente a 720p o menos, 
+        # con fallbacks seguros para evitar el error de formato no disponible.
+        'format': 'b*[height<=720]/best[height<=720]/best',
         'outtmpl': output_template,
         'noplaylist': True,
-        # Esto le dice a yt-dlp que descargue únicamente el fragmento indicado ahorrando RAM y ancho de banda
         'download_ranges': yt_dlp.utils.download_range_func(None, [(start_time, end_time)]),
-        'force_keyframes_at_cuts': True,
         'extractor_args': {
             'youtube': {
                 'player_client': ['tv_embedded', 'web', 'mweb']
