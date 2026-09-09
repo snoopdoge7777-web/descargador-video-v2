@@ -1,9 +1,41 @@
 import os
 import tempfile
-from flask import Flask, request, send_file, jsonify
+from flask import Flask, request, jsonify
 import yt_dlp
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 app = Flask(__name__)
+
+# Configuración de Google Drive (Lee las credenciales desde una variable de entorno en Render)
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+
+def upload_to_drive(file_path, file_name):
+    """Sube el archivo descargado a Google Drive y retorna el enlace web."""
+    # Puedes guardar tus credenciales de Service Account en una variable de entorno llamada GOOGLE_CREDENTIALS_JSON
+    creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+    if not creds_json:
+        raise Exception("Falta la variable de entorno GOOGLE_CREDENTIALS_JSON")
+
+    # Guardar temporalmente el JSON de credenciales
+    creds_path = '/tmp/credentials.json'
+    with open(creds_path, 'w') as f:
+        f.write(creds_json)
+
+    creds = service_account.Credentials.from_service_account_file(creds_path, scopes=SCOPES)
+    service = build('drive', 'v3', credentials=creds)
+
+    file_metadata = {'name': file_name}
+    media = MediaFileUpload(file_path, resumable=True)
+
+    file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+    
+    # Limpiar archivo temporal de credenciales
+    if os.path.exists(creds_path):
+        os.remove(creds_path)
+
+    return file.get('webViewLink'), file.get('id')
 
 @app.route('/download', methods=['POST'])
 def download_video():
@@ -13,48 +45,54 @@ def download_video():
 
     url = data['url']
     temp_dir = tempfile.mkdtemp()
-    output_template = os.path.join(temp_dir, 'clipped_video.mp4')
+    output_template = os.path.join(temp_dir, 'source_video.mp4')
 
     proxy_url = os.environ.get('PROXY_URL')
 
-    start_time = 30
-    end_time = 45
-
+    # Opciones de yt-dlp seguras y limitadas a 720p para cuidar la RAM de Render
     ydl_opts = {
-        # Usar 'best' genérico con respaldo garantiza que nunca falle por formato no disponible
-        'format': 'best/bestvideo+bestaudio/best',
+        'format': 'b[height<=720]/best[height<=720]/b/best',
         'outtmpl': output_template,
         'noplaylist': True,
         'merge_output_format': 'mp4',
-        'download_ranges': yt_dlp.utils.download_range_func(None, [(start_time, end_time)]),
         'extractor_args': {
             'youtube': {
                 'player_client': ['android', 'web']
-            },
-            'youtubetab': {
-                'skip': ['authcheck']
             }
         },
-        'quiet': False,
-        'no_warnings': False,
+        'quiet': True
     }
 
     if proxy_url:
         ydl_opts['proxy'] = proxy_url
 
     try:
+        # 1. Descargar el video de YouTube en Render
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
         if not os.path.exists(output_template):
-            # Por si el nombre final se ajusta con la extensión real del merge
-            files = os.listdir(temp_dir)
+            # Buscar si se guardó con otra extensión por el merge
+            files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.mp4')]
             if files:
-                output_template = os.path.join(temp_dir, files[0])
+                output_template = files[0]
             else:
-                return jsonify({'status': 'error', 'message': 'No se pudo generar el recorte'}), 500
+                return jsonify({'status': 'error', 'message': 'No se pudo descargar el video'}), 500
 
-        return send_file(output_template, as_attachment=True, download_name='clip.mp4')
+        # 2. Subir directamente a Google Drive
+        file_name = f"youtube_video_{os.path.basename(output_template)}"
+        web_link, file_id = upload_to_drive(output_template, file_name)
+
+        # 3. Borrar el video localmente en Render para liberar espacio/RAM de inmediato
+        if os.path.exists(output_template):
+            os.remove(output_template)
+
+        # 4. Devolver la URL de Drive a n8n
+        return jsonify({
+            'status': 'success',
+            'drive_url': web_link,
+            'file_id': file_id
+        }), 200
 
     except Exception as e:
         return jsonify({
