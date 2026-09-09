@@ -16,7 +16,7 @@ def download_video():
     temp_dir = tempfile.mkdtemp()
     output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
-    # Toma la URL del proxy cargada en Render
+    # Obtiene la URL del proxy desde las variables de Render
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
@@ -36,7 +36,7 @@ def download_video():
         'no_warnings': False,
     }
 
-    # Si la variable existe en Render, se asigna el proxy
+    # Asigna el proxy si la variable existe en Render
     if proxy_url:
         ydl_opts['proxy'] = proxy_url
 
