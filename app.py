@@ -19,11 +19,7 @@ def download_video():
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': output_template,
-        
-        # Archivo de cookies registrado en tu repositorio
         'cookiefile': 'www.youtube.com_cookies.txt',
-        
-        # Selección de clientes para la extracción de video
         'extractor_args': {
             'youtube': {
                 'player_client': ['tv_embedded', 'web', 'mweb']
