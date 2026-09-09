@@ -5,7 +5,7 @@ import numpy as np
 from flask import Flask, request, send_file, jsonify
 import yt_dlp
 
-# Manejo de compatibilidad para MoviePy v1 y v2
+# Soporte de compatibilidad para MoviePy v1 y v2
 try:
     from moviepy.editor import VideoFileClip, CompositeVideoClip, vfx
 except ModuleNotFoundError:
@@ -97,10 +97,12 @@ def download_video():
 
     proxy_url = os.environ.get('PROXY_URL')
 
+    # Regla flexible de formatos para que no falle si no halla mp4/m4a estrictos
     ydl_opts = {
-        'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
+        'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
         'outtmpl': video_path,
         'noplaylist': True,
+        'merge_output_format': 'mp4',
         'extractor_args': {
             'youtube': {
                 'player_client': ['tv_embedded', 'web', 'mweb']
