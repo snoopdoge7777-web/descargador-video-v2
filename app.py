@@ -17,13 +17,26 @@ def download_video():
     output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        # 1. Solicita un solo formato combinado para no hacer peticiones dobles de audio/video
+        'format': 'b/best[ext=mp4]/best',
         'outtmpl': output_template,
+        
+        # 2. Tu archivo de cookies recargado
         'cookiefile': 'www.youtube.com_cookies.txt',
+        
+        # 3. Evita procesar listas de reproducción enteras
         'noplaylist': True,
+        
+        # 4. Reduce peticiones secundarias
+        'writethumbnail': False,
+        'writeinfojson': False,
+        'ignoreerrors': False,
+        
+        # 5. Restringe las consultas a un solo cliente móvil liviano para minimizar llamadas a la API
         'extractor_args': {
             'youtube': {
-                'player_client': ['tv_embedded', 'web', 'mweb']
+                'player_client': ['mweb'],
+                'skip': ['dash', 'hls']  # Salta fragmentación innecesaria
             },
             'youtubetab': {
                 'skip': ['authcheck']
