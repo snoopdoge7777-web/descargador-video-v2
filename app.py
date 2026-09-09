@@ -17,20 +17,19 @@ def download_video():
 
     proxy_url = os.environ.get('PROXY_URL')
 
-    # Rango de tiempo para el corte (puedes parametrizarlo o dejarlo fijo por ahora)
     start_time = 30
     end_time = 45
 
     ydl_opts = {
-        # Busca la mejor calidad disponible pero limita estrictamente a 720p o menos, 
-        # con fallbacks seguros para evitar el error de formato no disponible.
-        'format': 'b*[height<=720]/best[height<=720]/best',
+        # Usar 'best' genérico con respaldo garantiza que nunca falle por formato no disponible
+        'format': 'best/bestvideo+bestaudio/best',
         'outtmpl': output_template,
         'noplaylist': True,
+        'merge_output_format': 'mp4',
         'download_ranges': yt_dlp.utils.download_range_func(None, [(start_time, end_time)]),
         'extractor_args': {
             'youtube': {
-                'player_client': ['tv_embedded', 'web', 'mweb']
+                'player_client': ['android', 'web']
             },
             'youtubetab': {
                 'skip': ['authcheck']
@@ -48,7 +47,12 @@ def download_video():
             ydl.download([url])
 
         if not os.path.exists(output_template):
-            return jsonify({'status': 'error', 'message': 'No se pudo generar el recorte'}), 500
+            # Por si el nombre final se ajusta con la extensión real del merge
+            files = os.listdir(temp_dir)
+            if files:
+                output_template = os.path.join(temp_dir, files[0])
+            else:
+                return jsonify({'status': 'error', 'message': 'No se pudo generar el recorte'}), 500
 
         return send_file(output_template, as_attachment=True, download_name='clip.mp4')
 
