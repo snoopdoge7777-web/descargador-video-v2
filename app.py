@@ -74,7 +74,7 @@ def detect_audio_highlights(video_path, clip_duration=15, top_n=3):
             clip_name, 
             codec="libx264", 
             audio_codec="aac", 
-            preset="fast",
+            preset="ultrafast", # 'ultrafast' consume menos CPU y RAM en Render
             logger=None
         )
         output_clips.append(clip_name)
@@ -97,9 +97,9 @@ def download_video():
 
     proxy_url = os.environ.get('PROXY_URL')
 
-    # Configuración todoterreno para yt-dlp
+    # Limita la resolución a <= 720p sin forzar streams separados de audio/video
     ydl_opts = {
-        'format': 'b/best', # Descarga directa del mejor stream combinado sin filtros estrictos
+        'format': 'b[height<=720]/best[height<=720]/b/best',
         'outtmpl': video_path,
         'noplaylist': True,
         'merge_output_format': 'mp4',
