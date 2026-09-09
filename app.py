@@ -16,13 +16,12 @@ def download_video():
     temp_dir = tempfile.mkdtemp()
     output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
-    # Obtiene la URL del proxy desde las variables de Render
+    # Lee el proxy desde las variables de Render
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
         'format': 'b/best[ext=mp4]/best',
         'outtmpl': output_template,
-        'cookiefile': 'www.youtube.com_cookies.txt',
         'noplaylist': True,
         'extractor_args': {
             'youtube': {
@@ -36,7 +35,7 @@ def download_video():
         'no_warnings': False,
     }
 
-    # Asigna el proxy si la variable existe en Render
+    # Asigna el proxy para salir por la IP limpia de Webshare
     if proxy_url:
         ydl_opts['proxy'] = proxy_url
 
