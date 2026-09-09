@@ -21,13 +21,13 @@ def download_video():
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': output_template,
         
-        # Apunta exactamente al nombre del archivo que tienes en GitHub
+        # Archivo de cookies tal cual lo tienes en GitHub
         'cookiefile': 'www.youtube.com_cookies.txt',
         
-        # Estrategia antibloqueo: simula clientes móviles para esquivar restricciones de IP
+        # Clientes que SÍ soportan cookies y evitan el salto/omisión en logs
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'android', 'mweb']
+                'player_client': ['tv_embedded', 'web', 'mweb']
             }
         },
         'quiet': False,
