@@ -1,8 +1,13 @@
 import os
 import tempfile
 import zipfile
+import subprocess
 import numpy as np
 from flask import Flask, request, send_file, jsonify
+
+# Forzar actualización de yt-dlp al vuelo para evitar bloqueos de YouTube
+subprocess.run(["pip", "install", "--upgrade", "yt-dlp"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 import yt_dlp
 
 try:
@@ -29,8 +34,19 @@ def download_video():
     url = data['url']
     temp_dir = tempfile.mkdtemp()
     
-    # 1. Obtener la duración total del video de forma ligera sin descargarlo completo
-    probe_opts = {'quiet': True, 'skip_download': True}
+    # Opciones robustas con clientes múltiples para evitar bloqueos de player response
+    ydl_base_opts = {
+        'noplaylist': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['web', 'mweb', 'android']
+            }
+        },
+        'quiet': True
+    }
+
+    # 1. Obtener la duración total del video
+    probe_opts = {**ydl_base_opts, 'skip_download': True}
     try:
         with yt_dlp.YoutubeDL(probe_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -38,7 +54,7 @@ def download_video():
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'No se pudo leer el video: {str(e)}'}), 500
 
-    # Definir 3 puntos de corte seguros (ej: al 20%, 50% y 80% del video, o por intervalos de 30s)
+    # Definir 3 puntos de corte
     clip_duration = 15
     start_times = [
         max(0, int(duration * 0.2)),
@@ -48,20 +64,17 @@ def download_video():
 
     output_clips = []
 
-    # 2. Descargar y procesar únicamente los pedazos necesarios (ahorra 90% de RAM y CPU)
+    # 2. Descargar y procesar los rangos de tiempo
     for idx, start_t in enumerate(start_times):
         end_t = min(start_t + clip_duration, duration)
         section_path = os.path.join(temp_dir, f'part_{idx}.mp4')
         
         ydl_opts = {
+            **ydl_base_opts,
             'format': 'b[height<=720]/best[height<=720]/b/best',
             'outtmpl': section_path,
-            'noplaylist': True,
-            # Descargar solo el rango de tiempo específico
             'download_ranges': yt_dlp.utils.download_range_func(None, [(start_t, end_t)]),
             'force_keyframes_at_cuts': True,
-            'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
-            'quiet': True
         }
 
         try:
@@ -69,7 +82,6 @@ def download_video():
                 ydl.download([url])
 
             if os.path.exists(section_path):
-                # Convertir a vertical con MoviePy
                 clip = VideoFileClip(section_path)
                 vertical_clip = make_vertical_clip(clip)
                 
