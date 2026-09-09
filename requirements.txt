@@ -4,3 +4,4 @@ moviepy
 pydub
 numpy
 imageio-ffmpeg
+gunicorn
