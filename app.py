@@ -102,7 +102,7 @@ def download_video():
     temp_dir = tempfile.mkdtemp()
     video_path = os.path.join(temp_dir, 'source_video.mp4')
 
-    # Configuración robusta con clientes estables y límite a 720p
+    # Configuración anti-bloqueo con cliente mweb y android para servidores cloud
     ydl_opts = {
         'format': 'b[height<=720]/best[height<=720]/b/best',
         'outtmpl': video_path,
@@ -110,9 +110,10 @@ def download_video():
         'merge_output_format': 'mp4',
         'extractor_args': {
             'youtube': {
-                'player_client': ['tv_embedded', 'android', 'web']
+                'player_client': ['mweb', 'android', 'web']
             }
         },
+        'geo_bypass': True,
         'quiet': True
     }
 
