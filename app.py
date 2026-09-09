@@ -7,35 +7,25 @@ import yt_dlp
 
 # Soporte de compatibilidad para MoviePy v1 y v2
 try:
-    from moviepy.editor import VideoFileClip, CompositeVideoClip, vfx
+    from moviepy.editor import VideoFileClip, CompositeVideoClip
 except ModuleNotFoundError:
-    from moviepy import VideoFileClip, CompositeVideoClip, vfx
+    from moviepy import VideoFileClip, CompositeVideoClip
 
 from pydub import AudioSegment
 
 app = Flask(__name__)
 
-def make_vertical_clip(clip, target_w=1080, target_h=1920):
-    """Transforma un clip horizontal a vertical 9:16 con fondo desenfocado."""
-    # 1. Crear el fondo ampliado y desenfocado
-    bg = clip.resize(height=target_h)
-    if bg.w < target_w:
-        bg = clip.resize(width=target_w)
-    bg = bg.crop(x_center=bg.w / 2, y_center=bg.h / 2, width=target_w, height=target_h)
-    bg = bg.filter(vfx.gaussian_blur, sigma=15) # Desenfoque de fondo
-
-    # 2. Redimensionar el video principal para que encaje al ancho
+def make_vertical_clip(clip, target_w=720, target_h=1280):
+    """Transforma un clip a vertical 720p sin filtros pesados de fondo."""
+    # Redimensionar el video principal para que encaje al ancho (720px)
     fg = clip.resize(width=target_w)
-
-    # 3. Superponer el video principal sobre el fondo
-    final = CompositeVideoClip([bg, fg.set_position("center")], size=(target_w, target_h))
     
-    # 4. Transiciones suaves (fade in/out de 0.5s)
-    final = final.fadein(0.5).fadeout(0.5)
+    # Superponer sobre lienzo centrado
+    final = CompositeVideoClip([fg.set_position("center")], size=(target_w, target_h))
     return final
 
 def detect_audio_highlights(video_path, clip_duration=15, top_n=3):
-    """Analiza picos de audio, corta los clips y los convierte a formato vertical."""
+    """Analiza picos de audio, corta los clips y los convierte a formato vertical 720p."""
     temp_audio = video_path + ".wav"
     clip = VideoFileClip(video_path)
     clip.audio.write_audiofile(temp_audio, logger=None)
@@ -66,7 +56,7 @@ def detect_audio_highlights(video_path, clip_duration=15, top_n=3):
         end_t = min(start_t + clip_duration, clip.duration)
         subclip = clip.subclip(start_t, end_t)
         
-        # Convertir a formato vertical 9:16
+        # Convertir a formato vertical 720p
         vertical_clip = make_vertical_clip(subclip)
         
         clip_name = os.path.join(output_dir, f"highlight_{idx+1}.mp4")
@@ -74,7 +64,8 @@ def detect_audio_highlights(video_path, clip_duration=15, top_n=3):
             clip_name, 
             codec="libx264", 
             audio_codec="aac", 
-            preset="ultrafast", # 'ultrafast' consume menos CPU y RAM en Render
+            preset="ultrafast",
+            threads=2,
             logger=None
         )
         output_clips.append(clip_name)
@@ -97,7 +88,7 @@ def download_video():
 
     proxy_url = os.environ.get('PROXY_URL')
 
-    # Limita la resolución a <= 720p sin forzar streams separados de audio/video
+    # Descarga priorizando la calidad de 720p
     ydl_opts = {
         'format': 'b[height<=720]/best[height<=720]/b/best',
         'outtmpl': video_path,
@@ -119,7 +110,7 @@ def download_video():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        # Recortar mejores partes y convertir a vertical 9:16
+        # Recortar mejores partes en 720p
         clips = detect_audio_highlights(video_path, clip_duration=15, top_n=3)
 
         # Comprimir en un .zip para n8n
