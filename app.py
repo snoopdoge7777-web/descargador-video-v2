@@ -4,18 +4,36 @@ import zipfile
 import numpy as np
 from flask import Flask, request, send_file, jsonify
 import yt_dlp
-from moviepy.editor import VideoFileClip
+from moviepy.editor import VideoFileClip, CompositeVideoClip, vfx
 from pydub import AudioSegment
 
 app = Flask(__name__)
 
+def make_vertical_clip(clip, target_w=1080, target_h=1920):
+    """Transforma un clip horizontal a vertical 9:16 con fondo desenfocado."""
+    # 1. Crear el fondo ampliado y desenfocado
+    bg = clip.resize(height=target_h)
+    if bg.w < target_w:
+        bg = clip.resize(width=target_w)
+    bg = bg.crop(x_center=bg.w / 2, y_center=bg.h / 2, width=target_w, height=target_h)
+    bg = bg.filter(vfx.gaussian_blur, sigma=15) # Desenfoque de fondo
+
+    # 2. Redimensionar el video principal para que encaje al ancho
+    fg = clip.resize(width=target_w)
+
+    # 3. Superponer el video principal sobre el fondo
+    final = CompositeVideoClip([bg, fg.set_position("center")], size=(target_w, target_h))
+    
+    # 4. Transiciones suaves (fade in/out de 0.5s)
+    final = final.fadein(0.5).fadeout(0.5)
+    return final
+
 def detect_audio_highlights(video_path, clip_duration=15, top_n=3):
-    """Analiza los picos de volumen del audio para extraer las mejores partes."""
+    """Analiza picos de audio, corta los clips y los convierte a formato vertical."""
     temp_audio = video_path + ".wav"
     clip = VideoFileClip(video_path)
     clip.audio.write_audiofile(temp_audio, logger=None)
 
-    # Cargar audio para análisis
     audio = AudioSegment.from_wav(temp_audio)
     samples = np.array(audio.get_array_of_samples())
     
@@ -42,11 +60,11 @@ def detect_audio_highlights(video_path, clip_duration=15, top_n=3):
         end_t = min(start_t + clip_duration, clip.duration)
         subclip = clip.subclip(start_t, end_t)
         
-        # Redimensionar a 720p si el video original es mayor/distinto
-        subclip_720p = subclip.resize(height=720) 
+        # Convertir a formato vertical 9:16
+        vertical_clip = make_vertical_clip(subclip)
         
         clip_name = os.path.join(output_dir, f"highlight_{idx+1}.mp4")
-        subclip_720p.write_videofile(
+        vertical_clip.write_videofile(
             clip_name, 
             codec="libx264", 
             audio_codec="aac", 
@@ -74,7 +92,6 @@ def download_video():
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
-        # Forzar descarga en 720p o la mejor calidad MP4 disponible hasta 720p
         'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
         'outtmpl': video_path,
         'noplaylist': True,
@@ -93,20 +110,19 @@ def download_video():
         ydl_opts['proxy'] = proxy_url
 
     try:
-        # 1. Descarga el video en 720p con proxy
+        # Descargar video
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        # 2. Corta las mejores partes basadas en el audio
+        # Recortar mejores partes y convertir a vertical 9:16
         clips = detect_audio_highlights(video_path, clip_duration=15, top_n=3)
 
-        # 3. Comprime los clips en un .zip para n8n
+        # Comprimir en un .zip para n8n
         zip_path = os.path.join(temp_dir, 'highlights.zip')
         with zipfile.ZipFile(zip_path, 'w') as zipf:
             for clip_file in clips:
                 zipf.write(clip_file, os.path.basename(clip_file))
 
-        # 4. Devuelve el archivo ZIP
         return send_file(zip_path, mimetype='application/zip', as_attachment=True, download_name='highlights.zip')
 
     except Exception as e:
