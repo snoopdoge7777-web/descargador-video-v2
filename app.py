@@ -97,7 +97,7 @@ def download_video():
 
     proxy_url = os.environ.get('PROXY_URL')
 
-    # Regla flexible de formatos para que no falle si no halla mp4/m4a estrictos
+    # Regla ultra permisiva de formatos
     ydl_opts = {
         'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
         'outtmpl': video_path,
@@ -105,7 +105,7 @@ def download_video():
         'merge_output_format': 'mp4',
         'extractor_args': {
             'youtube': {
-                'player_client': ['tv_embedded', 'web', 'mweb']
+                'player_client': ['android', 'web', 'mweb', 'tv_embedded']
             },
             'youtubetab': {
                 'skip': ['authcheck']
