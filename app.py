@@ -19,12 +19,15 @@ def download_video():
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
-        'format': 'best[ext=mp4]/best',
+        # Selector flexible: agarra el mejor video + mejor audio y los fusiona automáticamente con FFmpeg
+        'format': 'bv*+ba/b',
+        'merge_output_format': 'mp4',
         'outtmpl': output_template,
         'noplaylist': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['tv_embedded', 'web', 'mweb']
+                # Usar el cliente android evita los bloqueos actuales de PO Token en la nube
+                'player_client': ['android', 'web']
             },
             'youtubetab': {
                 'skip': ['authcheck']
@@ -41,6 +44,12 @@ def download_video():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
+            
+            # Asegurar la extensión mp4 tras la mezcla de FFmpeg
+            base, _ = os.path.splitext(filename)
+            mp4_filename = base + '.mp4'
+            if os.path.exists(mp4_filename):
+                filename = mp4_filename
 
         return send_file(filename, as_attachment=True)
 
