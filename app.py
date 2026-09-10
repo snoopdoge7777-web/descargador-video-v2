@@ -20,9 +20,10 @@ def download_video():
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
-        'format': 'b/best[ext=mp4]/best',
+        'format': 'best/bestvideo+bestaudio/best',
         'outtmpl': output_template,
         'noplaylist': True,
+        'merge_output_format': 'mp4',
         'extractor_args': {
             'youtube': {
                 'player_client': ['tv_embedded', 'web', 'mweb']
