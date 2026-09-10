@@ -19,9 +19,7 @@ def download_video():
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
-        # Formato robusto con fallback que aprovecha FFmpeg para unir video y audio sin errores
-        'format': 'bv*+ba/b / best',
-        'merge_output_format': 'mp4',
+        'format': 'best[ext=mp4]/best',
         'outtmpl': output_template,
         'noplaylist': True,
         'extractor_args': {
@@ -43,11 +41,6 @@ def download_video():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
-            
-            base, _ = os.path.splitext(filename)
-            mp4_filename = base + '.mp4'
-            if os.path.exists(mp4_filename):
-                filename = mp4_filename
 
         return send_file(filename, as_attachment=True)
 
