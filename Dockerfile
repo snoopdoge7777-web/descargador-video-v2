@@ -1,13 +1,13 @@
 FROM python:3.10-slim
 
-# Instalar FFmpeg
+# Instalar FFmpeg en el sistema operativo del contenedor
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copiar archivos e instalar dependencias
+# Copiar archivos e instalar dependencias de Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
