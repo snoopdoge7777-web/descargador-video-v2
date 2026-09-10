@@ -19,7 +19,7 @@ def download_video():
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
-        # Obliga a tomar el mejor video y audio real hasta 1080p sin restricciones forzosas de extensión
+        # Filtro estricto para asegurar la mejor calidad hasta 1080p combinada correctamente con el audio
         'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         'merge_output_format': 'mp4',
         'outtmpl': output_template,
