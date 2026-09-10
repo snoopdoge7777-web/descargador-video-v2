@@ -19,14 +19,13 @@ def download_video():
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
-        # Selector flexible: agarra el mejor video + mejor audio y los fusiona automáticamente con FFmpeg
-        'format': 'bv*+ba/b',
+        # Busca la mejor calidad de video hasta 1080p + mejor audio y los une en mp4
+        'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         'merge_output_format': 'mp4',
         'outtmpl': output_template,
         'noplaylist': True,
         'extractor_args': {
             'youtube': {
-                # Usar el cliente android evita los bloqueos actuales de PO Token en la nube
                 'player_client': ['android', 'web']
             },
             'youtubetab': {
