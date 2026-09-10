@@ -19,14 +19,15 @@ def download_video():
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
-        # Filtro estricto para asegurar la mejor calidad hasta 1080p combinada correctamente con el audio
+        # Fuerza la mejor combinación de video y audio hasta 1080p
         'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         'merge_output_format': 'mp4',
         'outtmpl': output_template,
         'noplaylist': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web']
+                # Forzar el cliente mweb y web junto con el bypass de nsig
+                'player_client': ['mweb', 'web']
             },
             'youtubetab': {
                 'skip': ['authcheck']
@@ -44,7 +45,6 @@ def download_video():
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
             
-            # Asegurar la extensión mp4 tras la mezcla de FFmpeg
             base, _ = os.path.splitext(filename)
             mp4_filename = base + '.mp4'
             if os.path.exists(mp4_filename):
