@@ -16,12 +16,12 @@ def download_video():
     temp_dir = tempfile.mkdtemp()
     output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
-    # Lee el proxy desde las variables de Render
     proxy_url = os.environ.get('PROXY_URL')
 
     ydl_opts = {
-        # Usa formatos precargados que no requieren ffmpeg para fusionar
-        'format': 'best[ext=mp4]/best',
+        # Formato robusto con fallback que aprovecha FFmpeg para unir video y audio sin errores
+        'format': 'bv*+ba/b / best',
+        'merge_output_format': 'mp4',
         'outtmpl': output_template,
         'noplaylist': True,
         'extractor_args': {
@@ -36,7 +36,6 @@ def download_video():
         'no_warnings': False,
     }
 
-    # Asigna el proxy para salir por la IP limpia de Webshare
     if proxy_url:
         ydl_opts['proxy'] = proxy_url
 
@@ -44,6 +43,11 @@ def download_video():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
+            
+            base, _ = os.path.splitext(filename)
+            mp4_filename = base + '.mp4'
+            if os.path.exists(mp4_filename):
+                filename = mp4_filename
 
         return send_file(filename, as_attachment=True)
 
